@@ -1,661 +1,462 @@
+
 import streamlit as st
 import sqlite3
 import requests
-import os
+import json
 from datetime import datetime
 
-# ==================================================
-# إعداد برهان
-# ==================================================
+# =========================
+# إعداد المنصة
+# =========================
 st.set_page_config(
     page_title="بُرهان | المرافق الذكي للباحث",
     page_icon="🔎",
     layout="wide"
 )
 
-DB_PATH = "burhan_database.db"
+DB = "burhan.db"
 
-# ==================================================
-# التصميم - أزرق بارد وأبيض - بدون فرض عرض Sidebar
-# ==================================================
+# =========================
+# التصميم
+# =========================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
-
-html, body, [class*="css"], input, textarea, button {
-    font-family: 'Cairo', sans-serif !important;
-}
-
 .stApp {
-    background: #FFFFFF !important;
-    color: #000000 !important;
-    direction: rtl;
+    background-color: #F5F8FC;
+    color: #101820;
 }
-
-/* Sidebar: لا نفرض عرضًا ولا min-width ولا max-width */
-section[data-testid="stSidebar"] {
-    background-color: #183B5B !important;
-    border: none !important;
+header[data-testid="stHeader"] {
+    background: transparent;
 }
-
-section[data-testid="stSidebar"] > div {
-    background-color: #183B5B !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-section[data-testid="stSidebar"] * {
-    color: #FFFFFF !important;
-}
-
-/* المحتوى */
 .block-container {
-    max-width: 1200px;
     padding-top: 1.5rem;
     padding-bottom: 3rem;
+    max-width: 1100px;
 }
-
-/* العناوين */
-h1, h2, h3, h4 {
-    color: #183B5B !important;
-    font-weight: 800 !important;
+h1, h2, h3 {
+    color: #163B5C !important;
 }
-
-/* النص */
-p, label, .stMarkdown {
-    color: #000000;
+p, label, li {
+    color: #182B3A;
 }
-
-/* خانات الإدخال */
-.stTextInput input,
-.stTextArea textarea,
-.stNumberInput input {
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-    border: 1px solid #183B5B !important;
-    border-radius: 10px !important;
-    caret-color: #183B5B !important;
+div[data-testid="stSelectbox"] {
+    background: white;
+    border-radius: 10px;
 }
-
-.stTextInput input::placeholder,
-.stTextArea textarea::placeholder {
-    color: #555555 !important;
-    opacity: 1 !important;
+div[data-testid="stForm"] {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #DCE6F0;
 }
-
-/* القوائم */
-.stSelectbox div[data-baseweb="select"] > div {
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
+div.stButton > button {
+    background: #174B75;
+    color: white;
+    border-radius: 9px;
+    border: none;
+    min-height: 42px;
 }
-
-/* الأزرار */
-.stButton > button,
-.stDownloadButton > button {
-    background-color: #183B5B !important;
-    color: #FFFFFF !important;
-    border: 1px solid #183B5B !important;
-    border-radius: 10px !important;
-    font-weight: 700 !important;
+div.stButton > button:hover {
+    background: #22658F;
+    color: white;
 }
-
-.stButton > button:hover,
-.stDownloadButton > button:hover {
-    background-color: #28577D !important;
-    color: #FFFFFF !important;
-}
-
-/* البطاقات */
 div[data-testid="stMetric"] {
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-    border: 1px solid #B8D0E5 !important;
-    border-radius: 12px !important;
-    padding: 15px !important;
+    background: white;
+    padding: 15px;
+    border: 1px solid #DCE6F0;
+    border-radius: 12px;
 }
-
-/* الرسائل */
-div[data-testid="stAlert"] {
-    background-color: #FFFFFF !important;
-    color: #000000 !important;
-    border: 1px solid #183B5B !important;
-    border-radius: 10px !important;
+div[data-testid="stChatMessage"] {
+    border-radius: 12px;
 }
-
-/* الفواصل */
 hr {
-    border-color: #B8D0E5 !important;
-}
-
-/* الهاتف: لا نتحكم في sidebar بعرض ثابت */
-@media (max-width: 768px) {
-    .block-container {
-        padding: 1rem 0.7rem 2rem 0.7rem !important;
-    }
-
-    h1 {
-        font-size: 1.65rem !important;
-    }
-
-    h2 {
-        font-size: 1.35rem !important;
-    }
-
-    h3 {
-        font-size: 1.15rem !important;
-    }
-
-    div[data-testid="stMetric"] {
-        padding: 10px !important;
-    }
+    border-color: #DCE6F0;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ==================================================
+# =========================
 # قاعدة البيانات
-# ==================================================
-def get_connection():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
-
+# =========================
 def init_db():
-    conn = get_connection()
+    conn = sqlite3.connect(DB)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS projects (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
+            topic TEXT,
             field TEXT,
-            description TEXT,
-            created_at TEXT,
-            analysis TEXT DEFAULT ''
+            problem TEXT,
+            methodology TEXT,
+            created_at TEXT
         )
     """)
     conn.commit()
     conn.close()
 
+def add_project(title, topic, field, problem, methodology):
+    conn = sqlite3.connect(DB)
+    conn.execute("""
+        INSERT INTO projects
+        (title, topic, field, problem, methodology, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        title, topic, field, problem, methodology,
+        datetime.now().strftime("%Y-%m-%d %H:%M")
+    ))
+    conn.commit()
+    conn.close()
+
 def get_projects():
-    conn = get_connection()
-    rows = conn.execute("""
-        SELECT id, title, field, description, created_at, analysis
-        FROM projects
-        ORDER BY id DESC
-    """).fetchall()
+    conn = sqlite3.connect(DB)
+    rows = conn.execute(
+        "SELECT * FROM projects ORDER BY id DESC"
+    ).fetchall()
     conn.close()
     return rows
 
-def create_project(title, field, description):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO projects (title, field, description, created_at, analysis)
-        VALUES (?, ?, ?, ?, ?)
-    """, (
-        title, field, description,
-        datetime.now().strftime("%Y-%m-%d %H:%M"), ""
-    ))
-    project_id = cur.lastrowid
-    conn.commit()
-    conn.close()
-    return project_id
-
-def update_analysis(project_id, analysis):
-    conn = get_connection()
-    conn.execute(
-        "UPDATE projects SET analysis=? WHERE id=?",
-        (analysis, project_id)
-    )
-    conn.commit()
-    conn.close()
-
 def delete_project(project_id):
-    conn = get_connection()
+    conn = sqlite3.connect(DB)
     conn.execute("DELETE FROM projects WHERE id=?", (project_id,))
     conn.commit()
     conn.close()
 
 init_db()
 
-# ==================================================
+# =========================
 # الذكاء الاصطناعي
-# ==================================================
-def get_api_key():
+# =========================
+def ask_ai(prompt, system_prompt=None):
     try:
-        return st.secrets.get("GROQ_API_KEY", "")
+        api_key = st.secrets["GROQ_API_KEY"]
     except Exception:
-        return os.environ.get("GROQ_API_KEY", "")
+        return "⚠️ لم يتم إعداد GROQ_API_KEY في إعدادات Secrets."
 
-def get_model():
-    try:
-        return st.secrets.get("GROQ_MODEL", "llama-3.3-70b-versatile")
-    except Exception:
-        return os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+    if not system_prompt:
+        system_prompt = """
+أنت بُرهان، مساعد ذكي متخصص في البحث العلمي.
+تساعد الباحثين والطلبة في:
+- اختيار وصياغة موضوعات البحث
+- تحليل المشكلات البحثية
+- صياغة الإشكالية والأسئلة والفرضيات
+- اقتراح المنهجيات
+- شرح المفاهيم العلمية
+- تنظيم البحث
 
-def call_ai(messages):
-    key = get_api_key()
-    if not key:
-        return "لم يتم إعداد مفتاح الذكاء الاصطناعي في إعدادات التطبيق (Secrets)."
+تحدث باللغة التي يستخدمها الباحث.
+كن دقيقاً، أكاديمياً، واضحاً ومنظماً.
+لا تختلق مراجع أو مصادر علمية.
+إذا لم تكن متأكداً من معلومة فصرّح بذلك.
+"""
 
     try:
         response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {key}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             },
             json={
-                "model": get_model(),
-                "messages": messages,
-                "temperature": 0.5,
-                "max_tokens": 3000
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.5
             },
             timeout=90
         )
 
-        if response.status_code != 200:
-            return (
-                f"حدث خطأ من خدمة الذكاء الاصطناعي "
-                f"({response.status_code}).\n{response.text[:800]}"
-            )
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"]
 
-        return response.json()["choices"][0]["message"]["content"]
-
-    except requests.exceptions.Timeout:
-        return "انتهت مدة الاتصال. حاول مرة أخرى."
+        return f"خطأ من خدمة الذكاء الاصطناعي: {response.status_code}\n{response.text}"
 
     except Exception as e:
-        return f"تعذر الاتصال: {str(e)}"
+        return f"حدث خطأ أثناء الاتصال: {e}"
 
-# ==================================================
-# مراحل البحث
-# ==================================================
-research_stages = [
-    ("01", "اختيار موضوع البحث",
-     "اختيار موضوع واضح، قابل للدراسة، ومرتبط باهتمام الباحث."),
-    ("02", "تحديد المشكلة",
-     "اكتشاف المشكلة البحثية وتحديد أبعادها ومن يتأثر بها."),
-    ("03", "صياغة الإشكالية",
-     "صياغة سؤال رئيسي وأسئلة فرعية توجه الدراسة."),
-    ("04", "بناء الفرضيات",
-     "اقتراح إجابات مؤقتة قابلة للاختبار عند الحاجة."),
-    ("05", "تحديد الأهداف",
-     "تحديد ما يسعى البحث إلى تحقيقه بوضوح."),
-    ("06", "الدراسات السابقة",
-     "استكشاف الأدبيات، وفهم ما تم بحثه وتحديد فجوات محتملة."),
-    ("07", "المنهجية",
-     "اختيار المنهج والأدوات ومجتمع الدراسة والعينة."),
-    ("08", "التحليل والنتائج",
-     "تحليل البيانات، ومناقشة النتائج، واستخلاص التوصيات.")
+# =========================
+# رأس المنصة والتنقل
+# =========================
+st.markdown("""
+<div style="
+    background:#173F63;
+    padding:24px;
+    border-radius:16px;
+    margin-bottom:15px;
+">
+    <h1 style="color:white !important;margin:0;">🔎 بُرهان</h1>
+    <p style="color:#FFFFFF !important;margin:6px 0 0 0;">
+        المرافق الذكي للباحث | من الفكرة إلى الدليل
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+pages = [
+    "الرئيسية",
+    "إنشاء مشروع",
+    "المساعد الذكي",
+    "مشاريعي",
+    "مراحل البحث",
+    "الإعدادات"
 ]
 
-# ==================================================
-# القائمة الجانبية
-# ==================================================
-st.sidebar.title("🔎 بُرهان")
-st.sidebar.caption("من الفكرة إلى الدليل")
-st.sidebar.divider()
-
-page = st.sidebar.radio(
-    "التنقل",
-    [
-        "الرئيسية",
-        "إنشاء مشروع",
-        "المساعد الذكي",
-        "مشاريعي",
-        "مراحل البحث",
-        "الإعدادات"
-    ],
-    key="navigation"
+page = st.selectbox(
+    "انتقل إلى القسم",
+    pages,
+    key="main_navigation"
 )
 
-st.sidebar.divider()
-st.sidebar.caption("المرافق الذكي للباحث")
-st.sidebar.caption("نسخة MVP الأولية")
+st.divider()
 
-# ==================================================
+# =========================
 # الصفحة الرئيسية
-# ==================================================
+# =========================
 if page == "الرئيسية":
+
+    st.title("مرحباً بك في بُرهان")
+
+    st.write("""
+    مساحة ذكية ترافقك في رحلتك البحثية، من بلورة الفكرة
+    إلى بناء بحث منظم وأكثر وضوحاً.
+    """)
+
     projects = get_projects()
-
-    st.title("بُرهان")
-    st.subheader("المرافق الذكي للباحث")
-    st.write("من الفكرة إلى الدليل — رحلة بحثية أكثر وضوحًا وتنظيمًا.")
-
-    st.info(
-        "ابدأ فكرتك البحثية، وحوّلها إلى مشروع علمي منظم "
-        "بمساعدة الذكاء الاصطناعي."
-    )
-
-    st.markdown("## لوحة الباحث")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("مشاريعك", len(projects))
-    c2.metric("مراحل البحث", 8)
-    c3.metric("المساعد الذكي", "متاح")
-
-    st.divider()
-    st.markdown("## كيف يساعدك بُرهان؟")
 
     c1, c2 = st.columns(2)
+
     with c1:
-        st.markdown("### تطوير الأفكار")
-        st.write("تحليل الأفكار الأولية وتحديد قابليتها للتطوير.")
-        st.markdown("### بناء الإشكالية")
-        st.write("اقتراح إشكاليات وأسئلة بحثية.")
+        st.metric("مشاريعك البحثية", len(projects))
 
     with c2:
-        st.markdown("### تنظيم البحث")
-        st.write("متابعة مراحل البحث العلمي الثمانية.")
-        st.markdown("### المساعدة الأكاديمية")
-        st.write("دعم الأهداف والفرضيات والمنهجية والكتابة.")
+        st.metric("المرافق البحثي", "متاح")
+
+    st.markdown("### ماذا يمكنك أن تفعل؟")
+
+    st.markdown("""
+    **إنشاء مشروع بحث**  
+    ابدأ بتنظيم فكرتك وتحويلها إلى مشروع بحث.
+
+    **المساعد الذكي**  
+    ناقش موضوعك، حلل إشكاليتك، واطلب المساعدة في مختلف مراحل البحث.
+
+    **مشاريعي**  
+    استعرض مشاريعك المحفوظة وارجع إليها.
+
+    **مراحل البحث**  
+    تعرّف على مراحل إنجاز البحث العلمي وتنظيم العمل.
+    """)
+
+    st.info("بُرهان مساعد لك، وليس بديلاً عن تفكيرك أو التحقق العلمي من المعلومات.")
+
+# =========================
+# إنشاء مشروع
+# =========================
+elif page == "إنشاء مشروع":
+
+    st.title("إنشاء مشروع بحث جديد")
+
+    with st.form("new_project_form"):
+
+        title = st.text_input("عنوان المشروع")
+
+        field = st.text_input(
+            "التخصص أو المجال",
+            placeholder="مثال: إدارة الأعمال، اقتصاد، علوم..."
+        )
+
+        topic = st.text_area(
+            "فكرة البحث",
+            placeholder="اشرح فكرتك البحثية باختصار..."
+        )
+
+        problem = st.text_area(
+            "المشكلة التي تريد دراستها",
+            placeholder="ما المشكلة التي يحاول البحث فهمها أو حلها؟"
+        )
+
+        methodology = st.text_input(
+            "المنهج (إن وجد)",
+            placeholder="يمكنك تركه فارغاً إذا لم تحدده بعد"
+        )
+
+        submitted = st.form_submit_button("حفظ المشروع")
+
+        if submitted:
+            if title.strip() and topic.strip():
+                add_project(title, topic, field, problem, methodology)
+                st.success("تم حفظ مشروعك بنجاح.")
+            else:
+                st.warning("يرجى إدخال عنوان المشروع وفكرة البحث.")
 
     st.divider()
-    st.markdown("## أحدث المشاريع")
-    if projects:
-        for p in projects[:5]:
-            st.markdown(f"**{p[1]}**")
-            st.caption(f"{p[2] or 'غير محدد'} · {p[4]}")
-    else:
-        st.info("لم تنشئ أي مشروع بعد.")
-
-# ==================================================
-# إنشاء مشروع
-# ==================================================
-elif page == "إنشاء مشروع":
-    st.title("إنشاء مشروع بحث")
-    st.write("أنشئ مساحة خاصة لتنظيم بحثك.")
-
-    with st.form("project_form"):
-        title = st.text_input("عنوان البحث")
-        field = st.selectbox(
-            "التخصص",
-            [
-                "إدارة الأعمال", "اقتصاد", "علوم التسيير",
-                "مالية ومحاسبة", "تسويق", "علوم اجتماعية",
-                "علوم إنسانية", "علوم طبيعية", "علوم تقنية", "أخرى"
-            ]
-        )
-        description = st.text_area(
-            "وصف فكرة البحث",
-            placeholder="اشرح فكرتك والمشكلة التي تريد دراستها...",
-            height=160
-        )
-        submitted = st.form_submit_button("إنشاء المشروع")
-
-    if submitted:
-        if not title.strip():
-            st.warning("أدخل عنوان البحث.")
-        else:
-            create_project(title.strip(), field, description.strip())
-            st.success("تم إنشاء المشروع بنجاح.")
-            st.rerun()
-
-# ==================================================
-# المساعد الذكي
-# ==================================================
-elif page == "المساعد الذكي":
-    st.title("المساعد البحثي الذكي")
-    st.write("حلّل فكرتك، طوّر إشكاليتك، وناقش بحثك مع بُرهان.")
-
-    projects = get_projects()
-    project_options = {"بدون ربط بمشروع": None}
-    for p in projects:
-        project_options[f"{p[1]} (#{p[0]})"] = p[0]
-
-    selected_name = st.selectbox("ربط التحليل بمشروع", list(project_options.keys()))
-    selected_project_id = project_options[selected_name]
+    st.markdown("### هل تحتاج مساعدة في تطوير فكرتك؟")
 
     idea = st.text_area(
-        "فكرة البحث",
-        placeholder="اكتب موضوع أو فكرة بحثك...",
-        height=150,
-        key="research_idea"
+        "اكتب فكرة البحث لتحليلها بالذكاء الاصطناعي",
+        key="idea_analysis_input"
     )
-
-    assistance = st.selectbox(
-        "نوع المساعدة",
-        [
-            "تحليل شامل للفكرة",
-            "صياغة الإشكالية والأسئلة",
-            "بناء الفرضيات والأهداف",
-            "اقتراح المنهجية",
-            "تطوير عنوان البحث",
-            "تقييم الفجوة البحثية",
-            "مناقشة مفتوحة"
-        ]
-    )
-
-    prompts = {
-        "تحليل شامل للفكرة": """
-حلل الفكرة من حيث:
-فهم الفكرة، المشكلة، الأهمية، نقاط القوة والضعف،
-القابلية للدراسة، المخاطر، والجوانب التي تحتاج توضيحًا.
-قدم نقدًا بنّاءً وأسئلة تطويرية.
-""",
-        "صياغة الإشكالية والأسئلة": """
-اشرح المشكلة البحثية، ثم اقترح إشكالية رئيسية وأسئلة فرعية،
-ووضح حدود الصياغة وما يجب التحقق منه.
-""",
-        "بناء الفرضيات والأهداف": """
-اقترح أهدافًا عامة وخاصة وفرضيات مناسبة إن كان البحث يحتاجها،
-وحدد المتغيرات المحتملة والعلاقة بينها.
-""",
-        "اقتراح المنهجية": """
-ناقش المناهج الممكنة، واقترح الأنسب مع التبرير،
-وأدوات جمع البيانات والمجتمع والعينة المحتملة وحدود المنهج.
-""",
-        "تطوير عنوان البحث": """
-اقترح خمسة عناوين أكاديمية واضحة وغير مبالغ فيها،
-ثم وضح الفروق بينها واختر العنوان الأكثر دقة مبدئيًا.
-""",
-        "تقييم الفجوة البحثية": """
-حدد فجوات محتملة فقط، وما يجب فحصه في الدراسات السابقة.
-لا تدّع أن الفجوة مؤكدة دون مراجعة المصادر.
-""",
-        "مناقشة مفتوحة": """
-ناقش الباحث كمشرف علمي نقدي وبنّاء،
-واطرح أسئلة مهمة واقترح تطويرات عملية.
-"""
-    }
 
     if st.button("تحليل الفكرة"):
-        if not idea.strip():
-            st.warning("اكتب فكرة البحث أولًا.")
-        else:
-            system = """
-أنت بُرهان، المرافق الذكي للباحث.
-تساعد الباحثين من مختلف المستويات باللغة العربية.
-كن دقيقًا، نقديًا، ومنظمًا.
-لا تختلق مراجع أو بيانات أو نتائج.
-وضح حدود المعرفة، ووجّه الباحث ولا تتخذ قراراته بدلًا عنه.
-تجنب الحشو والنصائح العامة.
+        if idea.strip():
+            with st.spinner("يجري تحليل الفكرة..."):
+                result = ask_ai(
+                    f"""
+حلل فكرة البحث التالية تحليلاً أكاديمياً:
+
+{idea}
+
+قدم:
+1. تقييم الفكرة
+2. نقاط القوة والضعف
+3. إمكانية تطويرها
+4. مشكلة بحثية محتملة
+5. أسئلة بحث مقترحة
+6. عنوان أكاديمي مناسب
 """
-            messages = [
-                {"role": "system", "content": system},
-                {
-                    "role": "user",
-                    "content": f"فكرة البحث:\n{idea}\n\nالمهمة:\n{prompts[assistance]}"
-                }
-            ]
-
-            with st.spinner("برهان يحلل الفكرة..."):
-                result = call_ai(messages)
-
-            st.markdown("---")
-            st.markdown("## نتيجة التحليل")
+                )
+            st.markdown("### نتيجة التحليل")
             st.markdown(result)
+        else:
+            st.warning("أدخل فكرة البحث أولاً.")
 
-            st.session_state.last_analysis = result
-            st.session_state.last_idea = idea
+# =========================
+# المساعد الذكي
+# =========================
+elif page == "المساعد الذكي":
 
-            if selected_project_id is not None:
-                update_analysis(selected_project_id, result)
-                st.success("تم حفظ التحليل في المشروع.")
+    st.title("المساعد البحثي الذكي")
 
-            st.download_button(
-                "تحميل نتيجة التحليل",
-                data=result,
-                file_name="burhan_analysis.txt",
-                mime="text/plain"
-            )
-
-    # محادثة
-    st.divider()
-    st.markdown("## محادثة مع برهان")
+    st.write("اطرح سؤالاً، ناقش موضوعاً، أو اطلب مساعدة في بحثك.")
 
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    for m in st.session_state.chat_history:
-        with st.chat_message(m["role"]):
-            st.markdown(m["content"])
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-    chat_input = st.chat_input("اكتب سؤالك البحثي...")
+    user_input = st.chat_input("اكتب سؤالك البحثي هنا...")
 
-    if chat_input:
-        st.session_state.chat_history.append(
-            {"role": "user", "content": chat_input}
-        )
+    if user_input:
 
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "أنت بُرهان، مساعد بحثي أكاديمي. "
-                    "ناقش المستخدم بالعربية، كن دقيقًا ولا تختلق مصادر."
-                )
-            }
-        ]
-        messages += st.session_state.chat_history[-12:]
+        st.session_state.chat_history.append({
+            "role": "user",
+            "content": user_input
+        })
 
-        with st.spinner("برهان يفكر..."):
-            answer = call_ai(messages)
+        with st.chat_message("user"):
+            st.markdown(user_input)
 
-        st.session_state.chat_history.append(
-            {"role": "assistant", "content": answer}
-        )
-        st.rerun()
+        with st.chat_message("assistant"):
+            with st.spinner("بُرهان يفكر..."):
+                conversation = ""
+                for msg in st.session_state.chat_history[-10:]:
+                    role = "الباحث" if msg["role"] == "user" else "بُرهان"
+                    conversation += f"{role}: {msg['content']}\n"
+
+                answer = ask_ai(conversation)
+                st.markdown(answer)
+
+        st.session_state.chat_history.append({
+            "role": "assistant",
+            "content": answer
+        })
 
     if st.button("مسح المحادثة"):
         st.session_state.chat_history = []
         st.rerun()
 
-# ==================================================
-# المشاريع
-# ==================================================
+# =========================
+# مشاريعي
+# =========================
 elif page == "مشاريعي":
+
     st.title("مشاريعي البحثية")
+
     projects = get_projects()
 
     if not projects:
-        st.info("لا توجد مشاريع. أنشئ مشروعك الأول.")
+        st.info("لا توجد مشاريع محفوظة بعد. ابدأ بإنشاء مشروع جديد.")
     else:
-        project_map = {f"{p[1]} | #{p[0]}": p for p in projects}
-        selected = st.selectbox("اختر مشروعًا", list(project_map.keys()))
-        p = project_map[selected]
+        for project in projects:
 
-        st.divider()
-        st.header(p[1])
-        st.write("**التخصص:**", p[2] or "غير محدد")
-        st.write("**تاريخ الإنشاء:**", p[4])
+            with st.expander(f"📘 {project[1]}"):
 
-        st.markdown("### وصف المشروع")
-        st.write(p[3] or "لا يوجد وصف.")
+                st.markdown(f"**المجال:** {project[3] or 'غير محدد'}")
+                st.markdown("**فكرة البحث:**")
+                st.write(project[2] or "لم تتم إضافة الفكرة")
 
-        st.markdown("### تحليل المشروع")
-        if p[5]:
-            st.markdown(p[5])
-            st.download_button(
-                "تحميل التحليل",
-                data=p[5],
-                file_name=f"burhan_project_{p[0]}.txt",
-                mime="text/plain"
-            )
-        else:
-            st.info("لم يتم تحليل هذا المشروع بعد.")
+                st.markdown("**المشكلة البحثية:**")
+                st.write(project[4] or "لم يتم تحديد المشكلة")
 
-        st.divider()
-        if st.button("حذف المشروع"):
-            delete_project(p[0])
-            st.success("تم حذف المشروع.")
-            st.rerun()
+                st.markdown("**المنهج:**")
+                st.write(project[5] or "لم يتم تحديده")
 
-# ==================================================
+                st.caption(f"تاريخ الإنشاء: {project[6]}")
+
+                if st.button("حذف المشروع", key=f"del_{project[0]}"):
+                    delete_project(project[0])
+                    st.rerun()
+
+# =========================
 # مراحل البحث
-# ==================================================
+# =========================
 elif page == "مراحل البحث":
+
     st.title("مراحل البحث العلمي")
-    st.write("مسار إرشادي يساعدك على فهم وتنظيم مراحل بحثك.")
 
-    for number, name, description in research_stages:
-        with st.expander(f"{number} — {name}"):
-            st.write(description)
+    stages = [
+        ("1 — اختيار الموضوع",
+         "اختيار موضوع واضح ومناسب، يثير اهتمام الباحث وقابل للدراسة."),
+        ("2 — تحديد المشكلة",
+         "تحديد المشكلة البحثية وصياغتها بشكل واضح ودقيق."),
+        ("3 — صياغة الأسئلة والفرضيات",
+         "تحديد الأسئلة التي يسعى البحث للإجابة عنها، والفرضيات عند الحاجة."),
+        ("4 — مراجعة الأدبيات",
+         "الاطلاع على الدراسات السابقة والمراجع ذات الصلة."),
+        ("5 — تحديد المنهج",
+         "اختيار المنهج والأدوات المناسبة لطبيعة المشكلة."),
+        ("6 — جمع البيانات",
+         "جمع البيانات وفق أدوات ومنهجية واضحة."),
+        ("7 — تحليل البيانات",
+         "تنظيم البيانات وتحليلها للوصول إلى نتائج."),
+        ("8 — النتائج والمناقشة",
+         "عرض النتائج وتفسيرها ومقارنتها بالدراسات السابقة."),
+        ("9 — الخاتمة والتوصيات",
+         "تلخيص أهم النتائج وتقديم توصيات ومقترحات."),
+        ("10 — التوثيق والمراجعة",
+         "توثيق المصادر ومراجعة البحث لغوياً ومنهجياً.")
+    ]
 
-            guidance = {
-                "اختيار موضوع البحث": [
-                    "ما الموضوع الذي يثير اهتمامك؟",
-                    "هل الموضوع قابل للدراسة؟",
-                    "هل توجد بيانات يمكن الوصول إليها؟"
-                ],
-                "تحديد المشكلة": [
-                    "ما المشكلة الفعلية؟",
-                    "من يتأثر بها؟",
-                    "ما حدود المشكلة؟"
-                ],
-                "صياغة الإشكالية": [
-                    "ما السؤال الرئيسي؟",
-                    "ما الأسئلة الفرعية؟"
-                ],
-                "بناء الفرضيات": [
-                    "ما العلاقة المتوقع اختبارها؟",
-                    "هل يمكن اختبارها علميًا؟"
-                ],
-                "تحديد الأهداف": [
-                    "ما الهدف العام؟",
-                    "ما الأهداف الخاصة؟"
-                ],
-                "الدراسات السابقة": [
-                    "ماذا توصلت إليه الدراسات؟",
-                    "ما الذي يحتاج إلى بحث إضافي؟"
-                ],
-                "المنهجية": [
-                    "ما المنهج المناسب؟",
-                    "كيف سيتم جمع البيانات؟"
-                ],
-                "التحليل والنتائج": [
-                    "ماذا تظهر البيانات؟",
-                    "هل تجيب عن أسئلة البحث؟"
-                ]
-            }
+    for title, description in stages:
+        st.markdown(f"### {title}")
+        st.write(description)
+        st.divider()
 
-            st.markdown("**أسئلة تساعدك:**")
-            for q in guidance[name]:
-                st.write(f"- {q}")
-
-# ==================================================
+# =========================
 # الإعدادات
-# ==================================================
+# =========================
 elif page == "الإعدادات":
-    st.title("إعدادات بُرهان")
 
-    st.markdown("## معلومات المنصة")
-    st.write("**الاسم:** بُرهان")
-    st.write("**الوصف:** المرافق الذكي للباحث")
-    st.write("**الشعار:** من الفكرة إلى الدليل")
-    st.write("**الإصدار:** MVP الأولي")
+    st.title("الإعدادات")
 
-    st.divider()
-    st.markdown("## حالة الذكاء الاصطناعي")
+    st.markdown("### حول بُرهان")
 
-    if get_api_key():
-        st.success("مفتاح API موجود.")
-    else:
-        st.warning("لم يتم إضافة مفتاح API بعد.")
+    st.write("""
+    بُرهان هو مرافق ذكي للباحث، يهدف إلى تسهيل رحلة البحث العلمي
+    ومساعدة الباحث في التفكير والتحليل والتنظيم.
+    """)
 
-    st.markdown("## قاعدة البيانات")
-    st.write("تستخدم المنصة SQLite لحفظ المشاريع.")
+    st.markdown("**الاسم:** بُرهان (Burhan)")
+    st.markdown("**الشعار:** من الفكرة إلى الدليل")
+    st.markdown("**اللغة الأساسية:** العربية")
+    st.markdown("**الإصدار:** MVP")
 
     st.divider()
-    st.write(
-        "بُرهان أداة مساعدة بحثية. يجب التحقق من المعلومات "
-        "والمراجع والنتائج قبل اعتمادها علميًا."
-)
+
+    st.markdown("### إدارة المحادثة")
+
+    if st.button("إعادة ضبط المحادثة"):
+        st.session_state.chat_history = []
+        st.success("تمت إعادة ضبط المحادثة.")
