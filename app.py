@@ -10,58 +10,94 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
 
-html, body, [class*="css"], button, input, textarea {
+/* الخط العام */
+html, body, [class*="css"], input, textarea, button {
     font-family: 'Cairo', sans-serif !important;
 }
 
+/* الخلفية الرئيسية */
 .stApp {
-    background-color: #F7F9FC;
-    color: #172B4D;
+    background-color: #FFFFFF;
+    color: #000000;
     direction: rtl;
 }
 
+/* القائمة الجانبية */
 section[data-testid="stSidebar"] {
-    background-color: #14243A;
+    background-color: #183B5B;
 }
 
 section[data-testid="stSidebar"] * {
     color: #FFFFFF !important;
 }
 
-h1, h2, h3 {
-    color: #14243A !important;
+/* العناوين */
+h1, h2, h3, h4 {
+    color: #183B5B !important;
     font-weight: 800 !important;
 }
 
+/* النصوص */
 p, label, .stMarkdown {
-    color: #35445C;
+    color: #000000;
 }
 
+/* خانات الكتابة */
+.stTextInput input,
+.stTextArea textarea,
+.stNumberInput input {
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    border: 1px solid #183B5B !important;
+    border-radius: 9px !important;
+    caret-color: #183B5B !important;
+}
+
+/* النص الإرشادي داخل الخانات */
+.stTextInput input::placeholder,
+.stTextArea textarea::placeholder {
+    color: #555555 !important;
+    opacity: 1 !important;
+}
+
+/* القوائم المنسدلة */
+.stSelectbox div[data-baseweb="select"] > div {
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+}
+
+/* الأزرار */
 .stButton > button {
-    background-color: #087F8C;
-    color: white !important;
-    border: none;
-    border-radius: 10px;
-    padding: 10px 22px;
-    font-weight: 700;
+    background-color: #183B5B !important;
+    color: #FFFFFF !important;
+    border: 1px solid #183B5B !important;
+    border-radius: 9px !important;
+    font-weight: 700 !important;
 }
 
 .stButton > button:hover {
-    background-color: #06636D;
-    border: none;
+    background-color: #28577D !important;
+    color: #FFFFFF !important;
 }
 
+/* البطاقات */
 div[data-testid="stMetric"] {
-    background: white;
-    padding: 18px;
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    border: 1px solid #B8D0E5;
     border-radius: 12px;
-    border: 1px solid #E3EAF2;
+    padding: 18px;
 }
 
-input, textarea {
-    border-radius: 9px !important;
+/* الرسائل */
+div[data-testid="stAlert"] {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 1px solid #183B5B;
+    border-radius: 10px;
 }
 
+/* المسافات */
 .block-container {
     padding-top: 2rem;
     padding-bottom: 3rem;
