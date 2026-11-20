@@ -8,21 +8,66 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Cairo', sans-serif;
+html, body, [class*="css"], button, input, textarea {
+    font-family: 'Cairo', sans-serif !important;
 }
+
 .stApp {
-    background: #f4f7fb;
+    background-color: #F7F9FC;
+    color: #172B4D;
     direction: rtl;
 }
+
+section[data-testid="stSidebar"] {
+    background-color: #14243A;
+}
+
+section[data-testid="stSidebar"] * {
+    color: #FFFFFF !important;
+}
+
+h1, h2, h3 {
+    color: #14243A !important;
+    font-weight: 800 !important;
+}
+
+p, label, .stMarkdown {
+    color: #35445C;
+}
+
+.stButton > button {
+    background-color: #087F8C;
+    color: white !important;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 22px;
+    font-weight: 700;
+}
+
+.stButton > button:hover {
+    background-color: #06636D;
+    border: none;
+}
+
+div[data-testid="stMetric"] {
+    background: white;
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid #E3EAF2;
+}
+
+input, textarea {
+    border-radius: 9px !important;
+}
+
 .block-container {
     padding-top: 2rem;
+    padding-bottom: 3rem;
 }
 </style>
 """, unsafe_allow_html=True)
-
 st.sidebar.title("🔎 بُرهان")
 st.sidebar.caption("من الفكرة إلى الدليل")
 page = st.sidebar.radio(
